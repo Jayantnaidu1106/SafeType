@@ -3,18 +3,24 @@
   "name": "SafeType",
   "version": "1.0",
   "description": "Confidence-boosting writing assistant",
-  "permissions": ["activeTab", "scripting", "storage"],
+  "permissions": ["activeTab", "scripting", "storage", "contextMenus"],
   "action": {
-    "default_popup": "index.html",
-    "default_icon": "icon.png"
+    "default_popup": "src/popup/popup.html",
+    "default_icon": {
+      "16": "icon.svg",
+      "32": "icon.svg",
+      "48": "icon.svg",
+      "128": "icon.svg"
+    }
   },
   "background": {
-    "service_worker": ".src/background.js"
+    "service_worker": "src/background.js"
   },
+  "options_page": "src/options/options.html",
   "content_scripts": [
     {
       "matches": ["<all_urls>"],
-      "js": ["content.js"]
+      "js": ["src/content.js"]
     }
   ],
   "web_accessible_resources": [

@@ -12,21 +12,56 @@ export default function Popup() {
   };
 
   return (
-    <div className="p-4 w-[300px]">
-      <h2 className="font-bold text-xl mb-2">🛡 SafeType</h2>
+    <div style={{ padding: '16px', width: '300px', fontFamily: 'Arial, sans-serif' }}>
+      <h2 style={{ fontWeight: 'bold', fontSize: '20px', marginBottom: '16px', color: '#4F46E5' }}>
+        🛡 SafeType
+      </h2>
       <textarea
         value={text}
         onChange={(e) => setText(e.target.value)}
-        className="w-full border rounded p-2 mb-2"
+        style={{
+          width: '100%',
+          border: '1px solid #d1d5db',
+          borderRadius: '8px',
+          padding: '12px',
+          marginBottom: '16px',
+          fontSize: '14px',
+          resize: 'vertical',
+          minHeight: '80px',
+          boxSizing: 'border-box'
+        }}
         placeholder="Type your message here..."
       />
       <button
         onClick={handleRewrite}
-        className="bg-blue-600 text-white rounded px-4 py-2 w-full mb-2"
+        style={{
+          background: '#4F46E5',
+          color: 'white',
+          border: 'none',
+          borderRadius: '8px',
+          padding: '12px 16px',
+          width: '100%',
+          marginBottom: '16px',
+          fontSize: '14px',
+          fontWeight: '500',
+          cursor: 'pointer'
+        }}
       >
         Rewrite with Confidence
       </button>
-      <div className="text-sm text-gray-700 whitespace-pre-wrap">{result}</div>
+      <div style={{
+        fontSize: '14px',
+        color: '#374151',
+        whiteSpace: 'pre-wrap',
+        lineHeight: '1.5',
+        background: '#f9fafb',
+        padding: '12px',
+        borderRadius: '8px',
+        border: '1px solid #e5e7eb',
+        minHeight: '60px'
+      }}>
+        {result || 'Your rewritten text will appear here...'}
+      </div>
     </div>
   );
 }
