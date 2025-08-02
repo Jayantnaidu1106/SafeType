@@ -3,7 +3,8 @@
   "name": "SafeType",
   "version": "1.0",
   "description": "Confidence-boosting writing assistant",
-  "permissions": ["activeTab", "scripting", "storage", "contextMenus"],
+  "permissions": ["activeTab", "scripting", "storage", "contextMenus", "notifications"],
+  "host_permissions": ["<all_urls>"],
   "action": {
     "default_popup": "src/popup/popup.html",
     "default_icon": {

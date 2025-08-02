@@ -102,11 +102,14 @@
         <textarea id="inputText" placeholder="Type something you'd like to rewrite with more confidence..."></textarea>
     </div>
     
-    <button id="rewriteBtn">Rewrite with Confidence</button>
-    
+    <div style="display: flex; gap: 8px; margin-bottom: 16px;">
+        <button id="analyzeBtn" style="flex: 1; background: #059669;">Check Confidence</button>
+        <button id="rewriteBtn" style="flex: 1;">Rewrite Text</button>
+    </div>
+
     <div class="input-section">
-        <label>Rewritten text:</label>
-        <div id="output" class="output">Your rewritten text will appear here...</div>
+        <label>Analysis & Results:</label>
+        <div id="output" class="output">Enter text above and click "Check Confidence" to analyze or "Rewrite Text" to improve it.</div>
     </div>
     
     <script type="module" src="popup.js"></script>

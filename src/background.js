@@ -1,3 +1,72 @@
+async function analyzeConfidence(inputText) {
+  try {
+    const result = await chrome.storage.sync.get(['geminiApiKey']);
+    const apiKey = result.geminiApiKey;
+
+    if (!apiKey) {
+      return { error: 'Please set your Gemini API key in the extension options.' };
+    }
+
+    const body = {
+      contents: [
+        {
+          parts: [
+            {
+              text: `Analyze the confidence level of this text on a scale of 1-10 (where 1 is very uncertain/hesitant and 10 is very confident/assertive). Also provide a brief explanation and suggest if it needs rewriting.
+
+Text: "${inputText}"
+
+Respond in this exact JSON format:
+{
+  "confidence_score": [number 1-10],
+  "explanation": "[brief explanation of why this score]",
+  "needs_rewriting": [true/false],
+  "suggested_improvements": "[what could be improved]"
+}`
+            }
+          ]
+        }
+      ]
+    };
+
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      }
+    );
+
+    if (!res.ok) {
+      return { error: `API Error (${res.status})` };
+    }
+
+    const data = await res.json();
+    const responseText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+
+    if (!responseText) {
+      return { error: 'No response from AI' };
+    }
+
+    try {
+      // Extract JSON from response
+      const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        const analysis = JSON.parse(jsonMatch[0]);
+        return { success: true, analysis };
+      } else {
+        return { error: 'Could not parse AI response' };
+      }
+    } catch (parseError) {
+      return { error: 'Invalid response format' };
+    }
+
+  } catch (error) {
+    return { error: error.message };
+  }
+}
+
 async function rewriteWithConfidence(inputText) {
   try {
     // Get API key from Chrome storage
@@ -114,6 +183,13 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg.type === 'REWRITE_TEXT') {
     rewriteWithConfidence(msg.payload).then((result) => {
       sendResponse({ rewrittenText: result });
+    });
+    return true; // Keep message channel open for async
+  }
+
+  if (msg.type === 'ANALYZE_CONFIDENCE') {
+    analyzeConfidence(msg.payload).then((result) => {
+      sendResponse(result);
     });
     return true; // Keep message channel open for async
   }
