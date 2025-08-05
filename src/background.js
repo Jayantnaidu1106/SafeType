@@ -12,7 +12,7 @@ async function analyzeConfidence(inputText) {
         {
           parts: [
             {
-              text: `Analyze the confidence level of this text on a scale of 1-10 (where 1 is very uncertain/hesitant and 10 is very confident/assertive). Also provide a brief explanation and suggest if it needs rewriting.
+              text: `Analyze the confidence level and emotional tone of this text on a scale of 1-10 (where 1 is very uncertain/hesitant and 10 is very confident/assertive). Also determine the mood and provide suggestions.
 
 Text: "${inputText}"
 
@@ -21,7 +21,10 @@ Respond in this exact JSON format:
   "confidence_score": [number 1-10],
   "explanation": "[brief explanation of why this score]",
   "needs_rewriting": [true/false],
-  "suggested_improvements": "[what could be improved]"
+  "suggested_improvements": "[what could be improved]",
+  "mood": "[one of: Confident, Neutral, Anxious, Excited, Frustrated, Sad, Happy]",
+  "emotional_tone": "[brief description of the emotional tone detected]",
+  "writing_style": "[formal/informal/casual/professional]"
 }`
             }
           ]
@@ -60,6 +63,74 @@ Respond in this exact JSON format:
       }
     } catch (parseError) {
       return { error: 'Invalid response format' };
+    }
+
+  } catch (error) {
+    return { error: error.message };
+  }
+}
+
+async function checkSafeContent(inputText) {
+  try {
+    const result = await chrome.storage.sync.get(['geminiApiKey']);
+    const apiKey = result.geminiApiKey;
+
+    if (!apiKey) {
+      return { error: 'Please set your Gemini API key in the extension options.' };
+    }
+
+    const body = {
+      contents: [
+        {
+          parts: [
+            {
+              text: `Analyze this text for inappropriate content including profanity, hate speech, harassment, threats, or other harmful language.
+
+Text: "${inputText}"
+
+Respond in this exact JSON format:
+{
+  "is_safe": [true/false],
+  "content_issues": "[list any issues found, or empty string if safe]",
+  "severity": "[low/medium/high if not safe, or 'none' if safe]",
+  "suggested_alternative": "[cleaner version if not safe, or empty string if safe]"
+}`
+            }
+          ]
+        }
+      ]
+    };
+
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      }
+    );
+
+    if (!res.ok) {
+      return { error: `API Error (${res.status})` };
+    }
+
+    const data = await res.json();
+    const responseText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+
+    if (!responseText) {
+      return { error: 'No response from AI for safety check' };
+    }
+
+    try {
+      const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        const safetyCheck = JSON.parse(jsonMatch[0]);
+        return { success: true, safetyCheck };
+      } else {
+        return { error: 'Could not parse safety check response' };
+      }
+    } catch (parseError) {
+      return { error: 'Invalid safety check response format' };
     }
 
   } catch (error) {
@@ -146,12 +217,33 @@ async function rewriteWithConfidence(inputText) {
   }
 }
 
-// Create context menu
+// Initialize extension settings and context menu
 chrome.runtime.onInstalled.addListener(() => {
+  // Create context menu
   chrome.contextMenus.create({
     id: 'rewriteText',
     title: 'Rewrite with SafeType',
     contexts: ['selection']
+  });
+
+  // Initialize default settings
+  chrome.storage.sync.get(['toneDetection', 'safeFilter', 'zenMode'], function(result) {
+    const defaultSettings = {
+      toneDetection: result.toneDetection !== undefined ? result.toneDetection : true,
+      safeFilter: result.safeFilter !== undefined ? result.safeFilter : true,
+      zenMode: result.zenMode !== undefined ? result.zenMode : false
+    };
+
+    chrome.storage.sync.set(defaultSettings);
+    console.log('SafeType: Settings initialized:', defaultSettings);
+  });
+
+  // Initialize mood history if not exists
+  chrome.storage.local.get(['moodHistory'], function(result) {
+    if (!result.moodHistory) {
+      chrome.storage.local.set({ moodHistory: [] });
+      console.log('SafeType: Mood history initialized');
+    }
   });
 });
 
@@ -192,5 +284,50 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       sendResponse(result);
     });
     return true; // Keep message channel open for async
+  }
+
+  if (msg.type === 'CHECK_SAFE_CONTENT') {
+    checkSafeContent(msg.payload).then((result) => {
+      sendResponse(result);
+    });
+    return true; // Keep message channel open for async
+  }
+
+  if (msg.type === 'GET_SETTINGS') {
+    chrome.storage.sync.get(['toneDetection', 'safeFilter', 'zenMode'], function(result) {
+      sendResponse(result);
+    });
+    return true;
+  }
+
+  if (msg.type === 'UPDATE_SETTING') {
+    const { setting, value } = msg.payload;
+    chrome.storage.sync.set({ [setting]: value }, function() {
+      console.log(`SafeType: Setting ${setting} updated to ${value}`);
+
+      // Notify all content scripts about the setting change
+      chrome.tabs.query({}, function(tabs) {
+        tabs.forEach(tab => {
+          chrome.tabs.sendMessage(tab.id, {
+            type: 'SETTING_CHANGED',
+            setting: setting,
+            value: value
+          }).catch(() => {
+            // Ignore errors for tabs that don't have content script
+          });
+        });
+      });
+
+      sendResponse({ success: true });
+    });
+    return true;
+  }
+
+  if (msg.type === 'CLEAR_MOOD_HISTORY') {
+    chrome.storage.local.set({ moodHistory: [] }, function() {
+      console.log('SafeType: Mood history cleared');
+      sendResponse({ success: true });
+    });
+    return true;
   }
 });

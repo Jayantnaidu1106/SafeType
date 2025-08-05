@@ -1,30 +1,56 @@
 document.addEventListener('DOMContentLoaded', function() {
     const inputText = document.getElementById('inputText');
     const rewriteBtn = document.getElementById('rewriteBtn');
-    const analyzeBtn = document.getElementById('analyzeBtn');
-    const output = document.getElementById('output');
+    const feedbackMessage = document.getElementById('feedbackMessage');
+    const moodHistory = document.getElementById('moodHistory');
 
+    // Toggle switches
+    const toneDetectionToggle = document.getElementById('toneDetectionToggle');
+    const safeFilterToggle = document.getElementById('safeFilterToggle');
+    const zenModeToggle = document.getElementById('zenModeToggle');
+
+    // Load saved settings and mood history
+    loadSettings();
+    loadMoodHistory();
+
+    // Toggle switch event listeners
+    toneDetectionToggle.addEventListener('click', function() {
+        toggleSwitch(toneDetectionToggle, 'toneDetection');
+    });
+
+    safeFilterToggle.addEventListener('click', function() {
+        toggleSwitch(safeFilterToggle, 'safeFilter');
+    });
+
+    zenModeToggle.addEventListener('click', function() {
+        toggleSwitch(zenModeToggle, 'zenMode');
+    });
+
+    // Rewrite button functionality
     rewriteBtn.addEventListener('click', async function() {
         const text = inputText.value.trim();
-        
+
         if (!text) {
-            output.textContent = 'Please enter some text to rewrite.';
+            showFeedback('⚠️', 'Please enter some text to rewrite.', 'warning');
             return;
         }
 
-        // Disable button and show loading state
+        // Check safe filter if enabled
+        const settings = await getSettings();
+        if (settings.safeFilter && await containsInappropriateContent(text)) {
+            showFeedback('🚫', 'Content filtered: Please use appropriate language.', 'error');
+            return;
+        }
+
+        // Show loading state
         rewriteBtn.disabled = true;
-        rewriteBtn.textContent = 'Rewriting...';
-        output.innerHTML = '<span class="loading">Processing your text...</span>';
+        rewriteBtn.innerHTML = '<span>Rewriting...</span><span>⏳</span>';
 
         try {
-            // Send message to background script
             const response = await chrome.runtime.sendMessage({
                 type: 'REWRITE_TEXT',
                 payload: text
             });
-
-            console.log('Response from background:', response);
 
             if (response && response.rewrittenText) {
                 // Check if it's an error message
@@ -33,85 +59,255 @@ document.addEventListener('DOMContentLoaded', function() {
                     response.rewrittenText.startsWith('API Error') ||
                     response.rewrittenText.startsWith('Invalid') ||
                     response.rewrittenText.startsWith('Too many')) {
-                    output.innerHTML = `<span style="color: #dc2626;">${response.rewrittenText}</span>`;
+                    showFeedback('❌', response.rewrittenText, 'error');
                 } else {
-                    output.textContent = response.rewrittenText;
+                    // Update the text input with rewritten text
+                    inputText.value = response.rewrittenText;
+                    showFeedback('✅', 'Text rewritten successfully!', 'success');
+
+                    // Add to mood history
+                    addMoodEntry('Confident', 'Popup', '😊');
                 }
             } else {
-                output.innerHTML = '<span style="color: #dc2626;">No response received. Please check your API key and try again.</span>';
+                showFeedback('❌', 'No response received. Please check your API key.', 'error');
             }
         } catch (error) {
             console.error('Popup Error:', error);
-            output.innerHTML = `<span style="color: #dc2626;">Connection error: ${error.message}</span>`;
+            showFeedback('❌', `Connection error: ${error.message}`, 'error');
         } finally {
             // Re-enable button
             rewriteBtn.disabled = false;
-            rewriteBtn.textContent = 'Rewrite Text';
+            rewriteBtn.innerHTML = '<span>Rewrite with Confidence</span><span>↻</span>';
         }
     });
 
-    analyzeBtn.addEventListener('click', async function() {
+    // Auto-analyze text as user types
+    let analyzeTimeout;
+    inputText.addEventListener('input', function() {
+        clearTimeout(analyzeTimeout);
         const text = inputText.value.trim();
 
-        if (!text) {
-            output.textContent = 'Please enter some text to analyze.';
-            return;
+        if (text.length > 10) {
+            analyzeTimeout = setTimeout(() => {
+                analyzeTextConfidence(text);
+            }, 1500);
+        } else {
+            showFeedback('💭', 'Type something to get started...', 'neutral');
         }
+    });
 
-        // Disable button and show loading state
-        analyzeBtn.disabled = true;
-        analyzeBtn.textContent = 'Analyzing...';
-        output.innerHTML = '<span class="loading">Analyzing confidence level...</span>';
-
+    async function analyzeTextConfidence(text) {
         try {
+            const settings = await getSettings();
+
+            // Check safe filter if enabled
+            if (settings.safeFilter && await containsInappropriateContent(text)) {
+                showFeedback('🚫', 'Content filtered: Please use appropriate language.', 'error');
+                addMoodEntry('Filtered', 'Popup', '🚫');
+                return;
+            }
+
             const response = await chrome.runtime.sendMessage({
                 type: 'ANALYZE_CONFIDENCE',
                 payload: text
             });
 
             if (response.success && response.analysis) {
-                const { confidence_score, explanation, needs_rewriting, suggested_improvements } = response.analysis;
+                const { confidence_score, explanation, needs_rewriting } = response.analysis;
 
-                const scoreColor = confidence_score >= 7 ? '#10b981' : confidence_score >= 5 ? '#f59e0b' : '#ef4444';
-                const scoreEmoji = confidence_score >= 7 ? '✅' : confidence_score >= 5 ? '⚠️' : '❌';
+                // Determine mood and feedback
+                let mood, emoji, message;
+                if (confidence_score >= 7) {
+                    mood = 'Confident';
+                    emoji = '😊';
+                    message = 'This works well — go ahead!';
+                } else if (confidence_score >= 5) {
+                    mood = 'Neutral';
+                    emoji = '😐';
+                    message = 'This is okay, but could be more confident.';
+                } else {
+                    mood = 'Anxious';
+                    emoji = '😰';
+                    message = 'This text seems uncertain. Consider rewriting.';
+                }
 
-                output.innerHTML = `
-                    <div style="margin-bottom: 12px;">
-                        <div style="display: flex; align-items: center; margin-bottom: 8px;">
-                            <span style="font-size: 18px; margin-right: 8px;">${scoreEmoji}</span>
-                            <strong style="color: ${scoreColor};">Confidence Score: ${confidence_score}/10</strong>
-                        </div>
-                        <div style="margin-bottom: 8px;"><strong>Analysis:</strong> ${explanation}</div>
-                        ${needs_rewriting ? `<div style="margin-bottom: 8px;"><strong>Suggestions:</strong> ${suggested_improvements}</div>` : ''}
-                    </div>
-                    ${needs_rewriting ?
-                        `<div style="padding: 12px; background: #fef3c7; border-radius: 6px; border-left: 4px solid #f59e0b;">
-                            <strong>💡 Recommendation:</strong> This text could benefit from rewriting to sound more confident.
-                        </div>` :
-                        `<div style="padding: 12px; background: #d1fae5; border-radius: 6px; border-left: 4px solid #10b981;">
-                            <strong>👍 Great!</strong> This text already sounds confident and clear.
-                        </div>`
-                    }
-                `;
+                showFeedback(emoji, message, mood.toLowerCase());
+                addMoodEntry(mood, 'Popup', emoji);
+
             } else if (response.error) {
-                output.innerHTML = `<span style="color: #dc2626;">${response.error}</span>`;
-            } else {
-                output.innerHTML = '<span style="color: #dc2626;">Failed to analyze text. Please try again.</span>';
+                showFeedback('❌', response.error, 'error');
             }
         } catch (error) {
             console.error('Analysis Error:', error);
-            output.innerHTML = `<span style="color: #dc2626;">Connection error: ${error.message}</span>`;
-        } finally {
-            // Re-enable button
-            analyzeBtn.disabled = false;
-            analyzeBtn.textContent = 'Check Confidence';
+            showFeedback('❌', 'Analysis failed. Please try again.', 'error');
         }
-    });
+    }
 
-    // Allow Enter key to trigger analysis (with Ctrl/Cmd)
-    inputText.addEventListener('keydown', function(e) {
-        if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
-            analyzeBtn.click();
+    function showFeedback(emoji, text, type) {
+        const feedbackMessage = document.getElementById('feedbackMessage');
+        const emojiSpan = feedbackMessage.querySelector('.emoji');
+        const textSpan = feedbackMessage.querySelector('.text');
+
+        emojiSpan.textContent = emoji;
+        textSpan.textContent = text;
+
+        // Update styling based on type
+        feedbackMessage.className = 'feedback-message';
+        if (type === 'error') {
+            feedbackMessage.style.background = '#fef2f2';
+            feedbackMessage.style.borderColor = '#fecaca';
+            textSpan.style.color = '#dc2626';
+        } else if (type === 'warning') {
+            feedbackMessage.style.background = '#fffbeb';
+            feedbackMessage.style.borderColor = '#fed7aa';
+            textSpan.style.color = '#d97706';
+        } else if (type === 'success') {
+            feedbackMessage.style.background = '#f0fdf4';
+            feedbackMessage.style.borderColor = '#bbf7d0';
+            textSpan.style.color = '#166534';
+        } else {
+            feedbackMessage.style.background = '#f8fafc';
+            feedbackMessage.style.borderColor = '#e2e8f0';
+            textSpan.style.color = '#475569';
         }
-    });
+    }
+
+    function toggleSwitch(switchElement, settingName) {
+        switchElement.classList.toggle('active');
+        const isActive = switchElement.classList.contains('active');
+
+        // Save setting through background script
+        chrome.runtime.sendMessage({
+            type: 'UPDATE_SETTING',
+            payload: { setting: settingName, value: isActive }
+        }, function(response) {
+            if (response && response.success) {
+                console.log(`SafeType: ${settingName} setting updated to ${isActive}`);
+
+                // Show feedback based on setting
+                if (settingName === 'zenMode' && isActive) {
+                    showFeedback('🧘', 'Zen Mode enabled - minimal notifications', 'success');
+                } else if (settingName === 'safeFilter' && isActive) {
+                    showFeedback('🛡️', 'Safe Filter enabled - content will be filtered', 'success');
+                } else if (settingName === 'toneDetection' && isActive) {
+                    showFeedback('🎯', 'Real-time tone detection enabled', 'success');
+                }
+            }
+        });
+    }
+
+    async function loadSettings() {
+        try {
+            const response = await chrome.runtime.sendMessage({ type: 'GET_SETTINGS' });
+
+            // Set toggle states based on stored settings
+            if (response.toneDetection !== false) {
+                toneDetectionToggle.classList.add('active');
+            }
+            if (response.safeFilter !== false) {
+                safeFilterToggle.classList.add('active');
+            }
+            if (response.zenMode === true) {
+                zenModeToggle.classList.add('active');
+            }
+
+            console.log('SafeType: Settings loaded:', response);
+        } catch (error) {
+            console.error('SafeType: Error loading settings:', error);
+
+            // Fallback to default settings
+            toneDetectionToggle.classList.add('active');
+            safeFilterToggle.classList.add('active');
+        }
+    }
+
+    async function getSettings() {
+        return await chrome.storage.sync.get(['toneDetection', 'safeFilter', 'zenMode']);
+    }
+
+    async function containsInappropriateContent(text) {
+        // Simple content filter - in production, you'd use a more sophisticated filter
+        const inappropriateWords = [
+            'damn', 'hell', 'shit', 'fuck', 'bitch', 'ass', 'crap', 'piss',
+            'stupid', 'idiot', 'moron', 'dumb', 'hate', 'kill', 'die'
+        ];
+
+        const lowerText = text.toLowerCase();
+        return inappropriateWords.some(word => lowerText.includes(word));
+    }
+
+    function addMoodEntry(mood, source, emoji) {
+        const now = new Date();
+        const timeAgo = 'just now';
+
+        // Get existing mood history
+        chrome.storage.local.get(['moodHistory'], function(result) {
+            const history = result.moodHistory || [];
+
+            // Add new entry
+            history.unshift({
+                mood,
+                source,
+                emoji,
+                timestamp: now.toISOString(),
+                timeAgo
+            });
+
+            // Keep only last 10 entries
+            if (history.length > 10) {
+                history.splice(10);
+            }
+
+            // Save updated history
+            chrome.storage.local.set({ moodHistory: history });
+
+            // Update display
+            updateMoodHistoryDisplay(history);
+        });
+    }
+
+    function loadMoodHistory() {
+        chrome.storage.local.get(['moodHistory'], function(result) {
+            const history = result.moodHistory || [];
+            updateMoodHistoryDisplay(history);
+        });
+    }
+
+    function updateMoodHistoryDisplay(history) {
+        const moodHistory = document.getElementById('moodHistory');
+
+        if (history.length === 0) {
+            moodHistory.innerHTML = '<div style="text-align: center; color: #9ca3af; padding: 20px;">No recent activity</div>';
+            return;
+        }
+
+        moodHistory.innerHTML = history.map(entry => {
+            const timeAgo = getTimeAgo(new Date(entry.timestamp));
+            return `
+                <div class="mood-item">
+                    <div class="mood-left">
+                        <span class="mood-emoji">${entry.emoji}</span>
+                        <span class="mood-text">${entry.mood} — ${entry.source}</span>
+                    </div>
+                    <span class="mood-time">${timeAgo}</span>
+                </div>
+            `;
+        }).join('');
+    }
+
+    function getTimeAgo(date) {
+        const now = new Date();
+        const diffMs = now - date;
+        const diffMins = Math.floor(diffMs / 60000);
+        const diffHours = Math.floor(diffMs / 3600000);
+        const diffDays = Math.floor(diffMs / 86400000);
+
+        if (diffMins < 1) return 'just now';
+        if (diffMins < 60) return `${diffMins} min${diffMins > 1 ? 's' : ''} ago`;
+        if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
+        return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
+    }
+
+    // Initialize with default feedback
+    showFeedback('💭', 'Type something to get started...', 'neutral');
 });

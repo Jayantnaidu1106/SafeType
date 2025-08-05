@@ -6,112 +6,303 @@
     <title>SafeType</title>
     <style>
         body {
-            width: 300px;
-            height: 400px;
+            width: 380px;
+            min-height: 600px;
             margin: 0;
-            padding: 16px;
+            padding: 0;
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             background: #f8fafc;
+            color: #1f2937;
         }
-        
+
+        .container {
+            background: white;
+            border-radius: 16px;
+            margin: 8px;
+            padding: 24px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+        }
+
         .header {
-            text-align: center;
-            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            margin-bottom: 24px;
         }
-        
-        .logo {
-            font-size: 24px;
+
+        .logo-icon {
+            width: 32px;
+            height: 32px;
+            background: #10b981;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 12px;
+            color: white;
             font-weight: bold;
-            color: #4F46E5;
-            margin-bottom: 8px;
+            font-size: 18px;
         }
-        
-        .subtitle {
-            color: #64748b;
+
+        .header-text h1 {
+            margin: 0;
+            font-size: 20px;
+            font-weight: 600;
+            color: #1f2937;
+        }
+
+        .header-text p {
+            margin: 2px 0 0 0;
             font-size: 14px;
+            color: #6b7280;
         }
-        
-        .input-section {
-            margin-bottom: 16px;
+
+        .toggle-section {
+            margin-bottom: 32px;
         }
-        
-        label {
-            display: block;
-            margin-bottom: 8px;
+
+        .toggle-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 0;
+            border-bottom: 1px solid #f3f4f6;
+        }
+
+        .toggle-item:last-child {
+            border-bottom: none;
+        }
+
+        .toggle-label {
+            font-size: 16px;
             font-weight: 500;
             color: #374151;
         }
-        
-        textarea {
+
+        .toggle-switch {
+            position: relative;
+            width: 48px;
+            height: 24px;
+            background: #d1d5db;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+
+        .toggle-switch.active {
+            background: #10b981;
+        }
+
+        .toggle-switch::after {
+            content: '';
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            width: 20px;
+            height: 20px;
+            background: white;
+            border-radius: 50%;
+            transition: transform 0.3s ease;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .toggle-switch.active::after {
+            transform: translateX(24px);
+        }
+
+        .rewrite-section {
+            margin-bottom: 24px;
+        }
+
+        .section-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+
+        .section-icon {
+            margin-right: 8px;
+            font-size: 18px;
+        }
+
+        .section-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: #374151;
+        }
+
+        .text-input {
             width: 100%;
-            height: 80px;
+            min-height: 60px;
             padding: 12px;
             border: 1px solid #d1d5db;
             border-radius: 8px;
             font-size: 14px;
+            font-family: inherit;
             resize: vertical;
+            margin-bottom: 12px;
             box-sizing: border-box;
         }
-        
-        button {
+
+        .text-input:focus {
+            outline: none;
+            border-color: #10b981;
+            box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
+        }
+
+        .rewrite-button {
             width: 100%;
-            padding: 12px;
-            background: #4F46E5;
+            background: #3b82f6;
             color: white;
             border: none;
+            padding: 12px 16px;
             border-radius: 8px;
             font-size: 14px;
             font-weight: 500;
             cursor: pointer;
-            margin-bottom: 16px;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
         }
-        
-        button:hover {
-            background: #4338ca;
+
+        .rewrite-button:hover {
+            background: #2563eb;
         }
-        
-        button:disabled {
+
+        .rewrite-button:disabled {
             background: #9ca3af;
             cursor: not-allowed;
         }
-        
-        .output {
-            background: white;
-            border: 1px solid #e5e7eb;
+
+        .feedback-message {
+            background: #f0fdf4;
+            border: 1px solid #bbf7d0;
             border-radius: 8px;
             padding: 12px;
-            min-height: 60px;
-            font-size: 14px;
-            line-height: 1.5;
+            margin-bottom: 24px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
         }
-        
-        .loading {
-            color: #6b7280;
-            font-style: italic;
+
+        .feedback-message .emoji {
+            font-size: 18px;
+        }
+
+        .feedback-message .text {
+            font-size: 14px;
+            color: #166534;
+            font-weight: 500;
+        }
+
+        .mood-feedback {
+            margin-bottom: 24px;
+        }
+
+        .mood-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px 0;
+        }
+
+        .mood-left {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .mood-emoji {
+            font-size: 20px;
+        }
+
+        .mood-text {
+            font-size: 14px;
+            color: #374151;
+        }
+
+        .mood-time {
+            font-size: 12px;
+            color: #9ca3af;
+        }
+
+        .hidden {
+            display: none;
         }
     </style>
 </head>
 <body>
-    <div class="header">
-        <div class="logo">SafeType</div>
-        <div class="subtitle">Confidence-boosting writing assistant</div>
-    </div>
-    
-    <div class="input-section">
-        <label for="inputText">Enter your text:</label>
-        <textarea id="inputText" placeholder="Type something you'd like to rewrite with more confidence..."></textarea>
-    </div>
-    
-    <div style="display: flex; gap: 8px; margin-bottom: 16px;">
-        <button id="analyzeBtn" style="flex: 1; background: #059669;">Check Confidence</button>
-        <button id="rewriteBtn" style="flex: 1;">Rewrite Text</button>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <div class="logo-icon">✓</div>
+            <div class="header-text">
+                <h1>SafeType</h1>
+                <p>Writing Confidence Assistant</p>
+            </div>
+        </div>
+
+        <!-- Toggle Switches -->
+        <div class="toggle-section">
+            <div class="toggle-item">
+                <span class="toggle-label">Real-Time Tone Detection</span>
+                <div class="toggle-switch active" id="toneDetectionToggle"></div>
+            </div>
+            <div class="toggle-item">
+                <span class="toggle-label">Safe Filter Mode</span>
+                <div class="toggle-switch active" id="safeFilterToggle"></div>
+            </div>
+            <div class="toggle-item">
+                <span class="toggle-label">Zen Mode</span>
+                <div class="toggle-switch" id="zenModeToggle"></div>
+            </div>
+        </div>
+
+        <!-- Rewrite Section -->
+        <div class="rewrite-section">
+            <div class="section-header">
+                <span class="section-icon">↻</span>
+                <span class="section-title">Rewrite Your Text</span>
+            </div>
+            <textarea class="text-input" id="inputText" placeholder="I'm not sure if this is ok"></textarea>
+            <button class="rewrite-button" id="rewriteBtn">
+                <span>Rewrite with Confidence</span>
+                <span>↻</span>
+            </button>
+        </div>
+
+        <!-- Feedback Message -->
+        <div class="feedback-message" id="feedbackMessage">
+            <span class="emoji">😊</span>
+            <span class="text">This works well — go ahead!</span>
+        </div>
+
+        <!-- Recent Mood Feedback -->
+        <div class="mood-feedback">
+            <div class="section-header">
+                <span class="section-icon">📈</span>
+                <span class="section-title">Recent Mood Feedback</span>
+            </div>
+            <div id="moodHistory">
+                <div class="mood-item">
+                    <div class="mood-left">
+                        <span class="mood-emoji">😰</span>
+                        <span class="mood-text">Anxious — Gmail</span>
+                    </div>
+                    <span class="mood-time">2 mins ago</span>
+                </div>
+                <div class="mood-item">
+                    <div class="mood-left">
+                        <span class="mood-emoji">😊</span>
+                        <span class="mood-text">Neutral — Discord</span>
+                    </div>
+                    <span class="mood-time">10 mins ago</span>
+                </div>
+            </div>
+        </div>
     </div>
 
-    <div class="input-section">
-        <label>Analysis & Results:</label>
-        <div id="output" class="output">Enter text above and click "Check Confidence" to analyze or "Rewrite Text" to improve it.</div>
-    </div>
-    
-    <script type="module" src="popup.js"></script>
+    <script src="popup.js"></script>
 </body>
 </html>
