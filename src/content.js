@@ -505,8 +505,9 @@ function showConfidenceNotification(element, data) {
                         `;
                     }
                 } else {
-                    // Replace the text in the element
-                    replaceElementText(element, response.rewrittenText);
+                    // Replace the text in the element (robust method with fallbacks)
+                    const targetEl = resolveEditableElement(element);
+                    setElementText(targetEl, response.rewrittenText);
 
                     // Show success message
                     if (confidenceNotification) {
@@ -810,6 +811,38 @@ async function directTextReplacement(element, originalText) {
         }
     } catch (error) {
         console.error('SafeType: Direct replacement error:', error);
+    }
+}
+
+
+function resolveEditableElement(original) {
+    try {
+        // 1) If the original element still exists in DOM, use it
+        if (original && original.isConnected) return original;
+
+        // 2) If user is focused in an editable element, use that
+        const active = document.activeElement;
+        if (active && (
+            active.tagName === 'TEXTAREA' ||
+            active.tagName === 'INPUT' ||
+            active.contentEditable === 'true' ||
+            active.getAttribute('contenteditable') === 'true'
+        )) {
+            return active;
+        }
+
+        // 3) Gmail-specific compose body
+        const gmailBody = document.querySelector('[aria-label="Message body"][role="textbox"], div[aria-label="Message Body"], div[aria-label="Message body"]');
+        if (gmailBody) return gmailBody;
+
+        // 4) Generic fallbacks
+        const ce = document.querySelector('[contenteditable="true"], [role="textbox"]');
+        if (ce) return ce;
+
+        return original;
+    } catch (e) {
+        console.warn('SafeType: resolveEditableElement failed, falling back to original', e);
+        return original;
     }
 }
 
